@@ -1,0 +1,76 @@
+preprocess:
+    data_dir: '/home/tony/Documents/IBSR_nifti_stripped/'
+    output_dir: '/home/tony/Documents/IBSR_features_01/'
+    crop_size: 128
+    n_segments: 512
+    compactness: 10
+    n_vertexs: 512
+    n_features: 64
+    tao: 0.1
+    threshold: 0.5
+
+main:
+    random_seed: 'brain'
+    saved_dir: '/home/tony/Documents/Brain_GCN/models/deep/train'
+
+dataset:
+    name: 'BrainDataset'
+    kwargs:
+        data_dir: '/home/tony/Documents/IBSR_preprocessed_2d'
+        data_split_csv: '/home/tony/Documents/Brain_GCN/dataset_split_2d.csv'
+        train_preprocessings:
+        valid_preprocessings:
+        augments:
+        transforms:
+            - name: 'ToTensor'
+
+dataloader:
+    name: 'Dataloader'
+    kwargs:
+        train_batch_size: 1
+        valid_batch_size: 1
+        shuffle: true
+        num_workers: 4
+
+net:
+    name: 'DeepGCN'
+    kwargs:
+        n_feat: 64
+        n_hide: 1024
+        n_class: 4
+        dropout_rate: 0.1
+        
+losses:
+    - name: 'MyBCELoss'
+      kwargs:
+          weight: [0.2, 5.0, 1.0, 1.0]
+      weight: 1.0
+
+metrics:
+    - name: 'Dice'
+
+optimizer:
+    name: 'Adam'
+    kwargs:
+        lr: 0.001
+        weight_decay: 0
+        amsgrad: false
+
+logger:
+    name: 'KitsSegLogger'
+    kwargs:
+        dummy_input: [16, 1, 128, 128]
+
+monitor:
+    name: 'Monitor'
+    kwargs:
+        mode: 'min'
+        target: 'Loss'
+        saved_freq: 10
+        early_stop: 0
+
+trainer:
+    name: 'BrainTrainer'
+    kwargs:
+        device: 'cuda:0'
+        num_epochs: 100
