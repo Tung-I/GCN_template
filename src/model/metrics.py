@@ -90,16 +90,16 @@ class F1Score(nn.Module):
         super().__init__()
         self.TP = 0
         self.TN = 0
-        self.Fp = 0
+        self.FP = 0
         self.FN = 0
 
-    def _reset(self):
+    def reset(self):
         self.TP = 0
         self.TN = 0
         self.FP = 0
         self.FN = 0
 
-    def forward(self, output, target, segments):
+    def forward(self, output, target):
         """
         Args:
             output (torch.Tensor) (N, C): The model output.
@@ -107,19 +107,19 @@ class F1Score(nn.Module):
         Returns:
             metric (torch.Tensor) (0): The accuracy.
         """
-        pred = torch.argmax(output, dim=1)
-        pre_mask = torch.zeros_like(output).scatter_(1, pred.cpu().view(-1, 1), 1.)
-        tar_mask = torch.zeros_like(output).scatter_(1, target.data.cpu().view(-1, 1), 1.)
-        self.TP += (pre_mask[:, 1]*tar_mask[:, 1]).float().sum()
-        self.FP += (pre_mask[:, 1]*tar_mask[:, 0]).float().sum()
-        self.FN += (pre_mask[:, 0]*tar_mask[:, 1]).float().sum()
-        self.TN += (pre_mask[:, 0]*tar_mask[:, 0]).float().sum()
-        precision = self.TP/((self.TP+self.FP) + 1e-10) 
-        recall = self.TP/((self.TP+self.FN) + 1e-10)
-        F1 = 2*precision*recall / ((precision+recall) + 1e-10)
+        pred = torch.argmax(output, dim=1, keepdim=True)
+        pred_onehot = torch.zeros_like(output).scatter_(1, pred, 1)
+        target_onehot = torch.zeros_like(output).scatter_(1, target, 1)
+        self.TP += (pred_onehot * target_onehot).float().sum()
+        self.FP += (pred_onehot * (1.-target_onehot)).float().sum()
+        self.FN += ((1.-pred_onehot) * target_onehot).float().sum()
+        self.TN += ((1.-pred_onehot) * (1.-target_onehot)).float().sum()
+        precision = self.TP / (self.TP + self.FP + 1e-10) 
+        recall = self.TP / (self.TP + self.FN + 1e-10)
+        F1 = 2 * precision * recall / (precision + recall + 1e-10)
 
 
-        return (pred == target).float().mean()
+        return F1
 
 
 
@@ -128,6 +128,12 @@ class Accuracy(nn.Module):
     """
     def __init__(self):
         super().__init__()
+        self.T = 0.
+        self.F = 0.
+
+    def reset(self):
+        self.T = 0.
+        self.F = 0.
 
     def forward(self, output, target):
         """
@@ -138,15 +144,20 @@ class Accuracy(nn.Module):
             metric (torch.Tensor) (0): The accuracy.
         """
         pred = torch.argmax(output, dim=1)
-        return (pred == target).float().mean()
-
+        #self.T += (pred == target).float()
+        #self.F += (pred != target).float()
+        #return self.T / (self.F + self.T + 1e-10)
+        return pred==target
         
 class FalseNegativeSize(nn.Module):
     """The false negative target size.
     """
     def __init__(self):
         super().__init__()
-        
+       
+    def reset(self):
+        pass
+
     def forward(self, output, target):
         """
         Args:

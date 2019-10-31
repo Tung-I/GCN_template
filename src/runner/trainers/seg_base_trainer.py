@@ -4,6 +4,7 @@ from tqdm import tqdm
 import random
 import numpy as np
 
+from src.data.transforms import label2img
 
 class BaseTrainer:
     """The base class for all trainers.
@@ -61,6 +62,7 @@ class BaseTrainer:
             valid_log, valid_batch, valid_outputs = self._run_epoch('validation')
             logging.info(f'Valid log: {valid_log}.')
 
+
             # Adjust the learning rate.
             if self.lr_scheduler is None:
                 pass
@@ -100,6 +102,7 @@ class BaseTrainer:
         """Run an epoch for training.
         Args:
             mode (str): The mode of running an epoch ('training' or 'validation').
+
         Returns:
             log (dict): The log information.
             batch (dict or sequence): The last batch of the data.
@@ -115,29 +118,25 @@ class BaseTrainer:
                       desc=mode)
 
         log = self._init_log()
-
-        for m in self.metric_fns:
-            m.reset()
-
         count = 0
+        
         for batch in trange:
             batch = self._allocate_data(batch)
-            features, labels, adj_arr = self._get_inputs_targets(batch)
+            labels, gcnlabels, segments, features, adj_arr = self._get_inputs_targets(batch)
             if mode == 'training':
                 outputs = self.net(features, adj_arr)
-                losses = self._compute_losses(outputs, labels)
+                losses = self._compute_losses(outputs, gcnlabels)
                 loss = (torch.stack(losses) * self.loss_weights).sum()
-                #print()
-                #print(loss)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
             else:
                 with torch.no_grad():
                     outputs = self.net(features, adj_arr)
-                    losses = self._compute_losses(outputs, labels)
+                    losses = self._compute_losses(outputs, gcnlabels)
                     loss = (torch.stack(losses) * self.loss_weights).sum()
-            metrics =  self._compute_metrics(outputs, labels)
+            metrics =  self._compute_metrics(outputs, gcnlabels, segments)
+
             batch_size = self.train_dataloader.batch_size if mode == 'training' else self.valid_dataloader.batch_size
             self._update_log(log, batch_size, loss, losses, metrics)
             count += batch_size
@@ -146,12 +145,14 @@ class BaseTrainer:
         for key in log:
             log[key] /= count
 
+        outputs = label2img(outputs, segments)
         return log, batch, outputs
 
     def _allocate_data(self, batch):
         """Allocate the data to the device.
         Args:
             batch (dict or sequence): A batch of the data.
+
         Returns:
             batch (dict or sequence): A batch of the allocated data.
         """
@@ -168,6 +169,7 @@ class BaseTrainer:
         """Specify the data inputs and targets.
         Args:
             batch (dict or sequence): A batch of data.
+
         Returns:
             inputs (torch.Tensor or sequence of torch.Tensor): The data inputs.
             targets (torch.Tensor or sequence of torch.Tensor): The data targets.
@@ -179,6 +181,7 @@ class BaseTrainer:
         Args:
             outputs (torch.Tensor or sequence of torch.Tensor): The model outputs.
             targets (torch.Tensor or sequence of torch.Tensor): The data targets.
+
         Returns:
             losses (sequence of torch.Tensor): The computed losses.
         """
@@ -189,6 +192,7 @@ class BaseTrainer:
         Args:
             outputs (torch.Tensor or sequence of torch.Tensor): The model outputs.
             targets (torch.Tensor or sequence of torch.Tensor): The data targets.
+
         Returns:
             metrics (sequence of torch.Tensor): The computed metrics.
         """
@@ -219,10 +223,8 @@ class BaseTrainer:
         log['Loss'] += loss.item() * batch_size
         for loss_fn, loss in zip(self.loss_fns, losses):
             log[loss_fn.__class__.__name__] += loss.item() * batch_size
-            #log[loss_fn.__class__.__name__] = loss.item()
         for metric_fn, metric in zip(self.metric_fns, metrics):
             log[metric_fn.__class__.__name__] += metric.item() * batch_size
-            #log[metric_fn.__class__.__name__] = metric.item()
 
     def save(self, path):
         """Save the model checkpoint.

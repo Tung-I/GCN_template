@@ -10,12 +10,14 @@ class MyBCELoss(nn.Module):
         self.weight = torch.FloatTensor(weight).cuda()
 
     def forward(self, output, target):
-        #print(target.size())
-        target = torch.zeros_like(output).scatter_(1, target, 1)
         #print(output.size())
         #print(target.size())
-        loss = nn.BCELoss(weight=self.weight)
-        return loss(output, target)
+        #print(output)
+        #print(target)
+        target = torch.zeros_like(output).scatter_(1, target, 1)
+        loss_fnc = nn.BCELoss(weight=self.weight)
+        loss = loss_fnc(output, target)
+        return loss
 
 class DiceLoss(nn.Module):
     """The Dice loss.

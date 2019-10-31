@@ -1,22 +1,22 @@
 preprocess:
     data_dir: '/home/tony/Documents/kits19/data/'
     output_dir: '/home/tony/Documents/gcn_preprocess/kits19_3d'
-    n_segments: 512
-    compactness: 10
-    n_vertexs: 512
-    n_features: 64
+    z_crop_size: 48
+    n_segments: 2048
+    compactness: 0.1
+    n_vertexs: 2048
+    n_features: 128
     tao: 0.5
-    threshold: 0.5
 
 main:
     random_seed: 'kits19'
-    saved_dir: '/home/tony/Documents/GCN_template/models/kits_3d/train'
+    saved_dir: '/home/tony/Documents/GCN_template/models/kits_clf_3d/train'
 
 dataset:
-    name: 'KitsDataset'
+    name: 'KitsClfDataset'
     kwargs:
         data_dir: '/home/tony/Documents/gcn_preprocess/kits19_3d'
-        data_split_csv: '/home/tony/Documents/split/gcn_kits.csv'
+        data_split_csv: '/home/tony/Documents/data_split/kits_data_split.csv'
         train_preprocessings:
         valid_preprocessings:
         augments:
@@ -32,21 +32,22 @@ dataloader:
         num_workers: 4
 
 net:
-    name: 'DeepGCN'
+    name: 'ClfGCN'
     kwargs:
-        n_feat: 64
+        n_feat: 128
         n_hide: 1024
-        n_class: 4
-        dropout_rate: 0.1
+        n_class: 2
+        dropout_rate: 0.5
         
 losses:
     - name: 'MyBCELoss'
       kwargs:
-          weight: [0.2, 5.0, 1.0, 1.0]
+          weight: [0.2, 0.8]
       weight: 1.0
 
 metrics:
-    - name: 'Dice'
+    - name: 'Accuracy'
+    - name: 'F1Score'
 
 optimizer:
     name: 'Adam'
@@ -56,7 +57,7 @@ optimizer:
         amsgrad: false
 
 logger:
-    name: 'KitsSegLogger'
+    name: 'KitsClfLogger'
     kwargs:
         dummy_input: [16, 1, 128, 128]
 
@@ -69,7 +70,7 @@ monitor:
         early_stop: 0
 
 trainer:
-    name: 'BrainTrainer'
+    name: 'KitsClfTrainer'
     kwargs:
         device: 'cuda:0'
         num_epochs: 100
