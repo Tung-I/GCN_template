@@ -2,18 +2,18 @@ preprocess:
     data_dir: '/home/tony/Documents/kits19/data/'
     output_dir: '/home/tony/Documents/gcn_preprocess/kits19_3d'
     z_crop_size: 48
-    n_segments: 2048
+    n_segments: 1024
     compactness: 0.1
-    n_vertexs: 2048
+    n_vertexs: 1024
     n_features: 128
     tao: 0.5
 
 main:
     random_seed: 'kits19'
-    saved_dir: '/home/tony/Documents/GCN_template/models/kits_clf_3d/train'
+    saved_dir: '/home/tony/Documents/GCN_template/models/tmp/train'
 
 dataset:
-    name: 'KitsClfDataset'
+    name: 'DGLClfDataset'
     kwargs:
         data_dir: '/home/tony/Documents/gcn_preprocess/kits19_3d'
         data_split_csv: '/home/tony/Documents/data_split/kits_data_split.csv'
@@ -23,26 +23,27 @@ dataset:
         transforms:
             - name: 'ToTensor'
 
+
 dataloader:
     name: 'Dataloader'
     kwargs:
         train_batch_size: 1
         valid_batch_size: 1
         shuffle: true
-        num_workers: 4
+        num_workers: 2
 
 net:
-    name: 'ClfGCN'
+    name: 'GCNClassifier'
     kwargs:
-        n_feat: 128
-        n_hide: 1024
+        in_dim: 128
+        hidden_dim: 128
         n_class: 2
-        dropout_rate: 0.5
-        
+        #dropout_rate: 0.5
+
 losses:
     - name: 'MyBCELoss'
       kwargs:
-          weight: [0.2, 0.8]
+          weight: [0.5, 0.5]
       weight: 1.0
 
 metrics:
@@ -70,7 +71,7 @@ monitor:
         early_stop: 0
 
 trainer:
-    name: 'KitsClfTrainer'
+    name: 'DGLClfTrainer'
     kwargs:
         device: 'cuda:0'
         num_epochs: 100

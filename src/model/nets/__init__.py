@@ -5,3 +5,4 @@ from .deeplabv3plus import DeepLabV3Plus
 from .vnet import VNet
 from .gcn import GCN
 from .clf_gcn import ClfGCN
+from.dgl_gcn_classify import GCNClassifier

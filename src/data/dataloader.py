@@ -1,7 +1,20 @@
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
+import dgl
 
+def collate(samples):
+    # samples: list of pair (graph, label)
+    # print('#####')
+    # print(samples)
+    # print('@@@@@')
+    graphs, labels = map(list, zip(*samples))
+    batched_graph = dgl.batch(graphs)
+    labels = torch.tensor(labels)
+    labels = torch.unsqueeze(labels, 1)
+    # labels = labels.permute((1, 0))
+    return batched_graph, labels
+    
 
 class Dataloader(DataLoader):
     """The modified class of ``torch.utils.data.DataLoader`` with default ``collate_fn`` and ``worker_init_fn``.
@@ -23,6 +36,10 @@ class Dataloader(DataLoader):
                  pin_memory=False, drop_last=False, timeout=0, worker_init_fn=None):
         if worker_init_fn is None:
             worker_init_fn = self._default_worker_init_fn
+
+        #####
+        collate_fn = collate
+        #####
 
         if collate_fn is None:
             super().__init__(dataset=dataset,

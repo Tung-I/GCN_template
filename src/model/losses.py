@@ -12,9 +12,11 @@ class MyBCELoss(nn.Module):
     def forward(self, output, target):
         #print(output.size())
         #print(target.size())
-        #print(output)
-        #print(target)
+        # print(output)
+        # print(target)
         target = torch.zeros_like(output).scatter_(1, target, 1)
+        # print(target)
+        # print(output)
         loss_fnc = nn.BCELoss(weight=self.weight)
         loss = loss_fnc(output, target)
         return loss

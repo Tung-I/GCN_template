@@ -105,48 +105,7 @@ class BaseTrainer:
             batch (dict or sequence): The last batch of the data.
             outputs (torch.Tensor or sequence of torch.Tensor): The corresponding model outputs.
         """
-        if mode == 'training':
-            self.net.train()
-        else:
-            self.net.eval()
-        dataloader = self.train_dataloader if mode == 'training' else self.valid_dataloader
-        trange = tqdm(dataloader,
-                      total=len(dataloader),
-                      desc=mode)
-
-        log = self._init_log()
-
-        for m in self.metric_fns:
-            m.reset()
-
-        count = 0
-        for batch in trange:
-            batch = self._allocate_data(batch)
-            features, labels, adj_arr = self._get_inputs_targets(batch)
-            if mode == 'training':
-                outputs = self.net(features, adj_arr)
-                losses = self._compute_losses(outputs, labels)
-                loss = (torch.stack(losses) * self.loss_weights).sum()
-                #print()
-                #print(loss)
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-            else:
-                with torch.no_grad():
-                    outputs = self.net(features, adj_arr)
-                    losses = self._compute_losses(outputs, labels)
-                    loss = (torch.stack(losses) * self.loss_weights).sum()
-            metrics =  self._compute_metrics(outputs, labels)
-            batch_size = self.train_dataloader.batch_size if mode == 'training' else self.valid_dataloader.batch_size
-            self._update_log(log, batch_size, loss, losses, metrics)
-            count += batch_size
-            trange.set_postfix(**dict((key, f'{value / count: .3f}') for key, value in log.items()))
-
-        for key in log:
-            log[key] /= count
-
-        return log, batch, outputs
+        raise NotImplementedError
 
     def _allocate_data(self, batch):
         """Allocate the data to the device.

@@ -3,6 +3,8 @@ import glob
 import torch
 import numpy as np
 import nibabel as nib
+import dgl
+from tqdm import tqdm
 
 from src.data.datasets.base_dataset import BaseDataset
 from src.data.transforms import compose
@@ -45,17 +47,34 @@ class KitsClfDataset(BaseDataset):
         return len(self.data_paths)
 
     def __getitem__(self, index):
-        features_path, label_path, adj_path = self.data_paths[index]
+        feature_path, label_path, adj_path = self.data_paths[index]
         
         label = np.expand_dims(np.load(label_path).astype(np.int64), 0)
-        label = np.expand_dims(label, 1)
-        features = np.load(features_path).astype(np.float32)
+        #label = np.expand_dims(label, 1)
+        feature = np.load(feature_path).astype(np.float32)
         adj_arr = np.load(adj_path).astype(np.float32)
 
-        label, features, adj_arr = self.transforms(label, features, adj_arr, dtypes=[torch.long, torch.float, torch.float]) 
+        label, feature, adj_arr = self.transforms(label, feature, adj_arr, dtypes=[torch.long, torch.float, torch.float]) 
         
-        label, features, adj_arr = label.contiguous(), features.contiguous(), adj_arr.contiguous()
-        #return {"features": features, "adj_arr": adj_arr, "label": label, "segments": segments}
-        return {"features": features, "label": label, "adj_arr": adj_arr}
+        # n_node = features.size(0)
+        # g = dgl.DGLGraph()
+        # g.add_nodes(n_node)
+        # for i in range(n_node):
+        #     src = list(range(n_node))
+        #     dst = [i] * n_node
+        #     g.add_edges(src, dst)
+        # g.ndata['x'] = features
+        # for i in tqdm(range(n_node)):
+        #     src = list(range(n_node))
+        #     dst = [i] * n_node
+        #     val = torch.FloatTensor(n_node, 2)
+        #     val[:, 0] = adj_arr[i]
+        #     val[:, 1] = adj_arr[i]
+        #     g.edges[src, dst].data['w'] = val 
 
+
+        label, feature, adj_arr = label.contiguous(), feature.contiguous(), adj_arr.contiguous()
+        
+        return {"feature": feature, "label": label, "adj_arr": adj_arr}
+        # return {"graph": g, "label": label}
 

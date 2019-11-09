@@ -38,6 +38,108 @@ class Dice(nn.Module):
         return score
 
 
+class F1Score(nn.Module):
+    """The accuracy for the classification task.
+    """
+    def __init__(self):
+        super().__init__()
+        self.TP = 0
+        self.TN = 0
+        self.FP = 0
+        self.FN = 0
+
+    def reset(self):
+        self.TP = 0
+        self.TN = 0
+        self.FP = 0
+        self.FN = 0
+
+    def forward(self, output, target):
+        """
+        Args:
+            output (torch.Tensor) (N, C): The model output.
+            target (torch.LongTensor) (N): The data target.
+        Returns:
+            metric (torch.Tensor) (0): The accuracy.
+        """
+        pred = torch.argmax(output, dim=1, keepdim=True)
+        pred_onehot = torch.zeros_like(output).scatter_(1, pred, 1)
+        target_onehot = torch.zeros_like(output).scatter_(1, target, 1)
+        self.TP += (pred_onehot * target_onehot).float().sum()
+        self.FP += (pred_onehot * (1.-target_onehot)).float().sum()
+        self.FN += ((1.-pred_onehot) * target_onehot).float().sum()
+        self.TN += ((1.-pred_onehot) * (1.-target_onehot)).float().sum()
+        precision = self.TP / (self.TP + self.FP + 1e-10) 
+        recall = self.TP / (self.TP + self.FN + 1e-10)
+        F1 = 2 * precision * recall / (precision + recall + 1e-10)
+
+        return F1
+
+
+
+class Accuracy(nn.Module):
+    """The accuracy for the classification task.
+    """
+    def __init__(self):
+        super().__init__()
+        self.T = 0.
+        self.F = 0.
+
+    def reset(self):
+        self.T = 0.
+        self.F = 0.
+
+    def forward(self, output, target):
+        """
+        Args:
+            output (torch.Tensor) (N, C): The model output.
+            target (torch.LongTensor) (N): The data target.
+        Returns:
+            metric (torch.Tensor) (0): The accuracy.
+        """
+        pred = torch.argmax(output, dim=1)
+        self.T += (pred == target).float()
+        self.F += (pred != target).float()
+        return self.T / (self.F + self.T + 1e-10)
+        # return pred==target
+
+
+class FalseNegativeSize(nn.Module):
+    """The false negative target size.
+    """
+    def __init__(self):
+        super().__init__()
+       
+    def reset(self):
+        pass
+
+    def forward(self, output, target):
+        """
+        Args:
+            output (torch.Tensor) (N, C, *): The model output.
+            target (torch.LongTensor) (N, 1, *): The data target.
+        Returns:
+            metric (torch.Tensor) (C): The average false negative size for each class.
+        """
+        scores = []
+        # Get the one-hot encoding of the prediction and the ground truth label.
+        pred = output.argmax(dim=1, keepdim=True)
+        pred = torch.zeros_like(output).scatter_(1, pred, 1)
+        target = torch.zeros_like(output).scatter_(1, target, 1)
+        
+        # Calculate the score for each class
+        for i in range(1, output.shape[1]):
+            label_target = label(target[:, i].squeeze(dim=0).cpu().numpy(), connectivity=output.dim()-2)
+            label_target_list = np.unique(label_target)[1:]
+            _pred = pred[:, i].squeeze(dim=0).cpu().numpy()
+            
+            score = []
+            for target_id in label_target_list:
+                if (np.sum((_pred == 1) * (label_target == target_id)) == 0):
+                    score.append(np.sum(label_target == target_id) / 1000.0)
+            scores.append(score)
+        return scores
+
 # class Dice(nn.Module):
 #     """The Dice score.
 #     """
@@ -81,106 +183,3 @@ class Dice(nn.Module):
 #         union = (output_img ** 2).sum(reduced_dims) + (target ** 2).sum(reduced_dims)
 #         score = intersection / (union + 1e-10)
 #         return score
-
-
-class F1Score(nn.Module):
-    """The accuracy for the classification task.
-    """
-    def __init__(self):
-        super().__init__()
-        self.TP = 0
-        self.TN = 0
-        self.FP = 0
-        self.FN = 0
-
-    def reset(self):
-        self.TP = 0
-        self.TN = 0
-        self.FP = 0
-        self.FN = 0
-
-    def forward(self, output, target):
-        """
-        Args:
-            output (torch.Tensor) (N, C): The model output.
-            target (torch.LongTensor) (N): The data target.
-        Returns:
-            metric (torch.Tensor) (0): The accuracy.
-        """
-        pred = torch.argmax(output, dim=1, keepdim=True)
-        pred_onehot = torch.zeros_like(output).scatter_(1, pred, 1)
-        target_onehot = torch.zeros_like(output).scatter_(1, target, 1)
-        self.TP += (pred_onehot * target_onehot).float().sum()
-        self.FP += (pred_onehot * (1.-target_onehot)).float().sum()
-        self.FN += ((1.-pred_onehot) * target_onehot).float().sum()
-        self.TN += ((1.-pred_onehot) * (1.-target_onehot)).float().sum()
-        precision = self.TP / (self.TP + self.FP + 1e-10) 
-        recall = self.TP / (self.TP + self.FN + 1e-10)
-        F1 = 2 * precision * recall / (precision + recall + 1e-10)
-
-
-        return F1
-
-
-
-class Accuracy(nn.Module):
-    """The accuracy for the classification task.
-    """
-    def __init__(self):
-        super().__init__()
-        self.T = 0.
-        self.F = 0.
-
-    def reset(self):
-        self.T = 0.
-        self.F = 0.
-
-    def forward(self, output, target):
-        """
-        Args:
-            output (torch.Tensor) (N, C): The model output.
-            target (torch.LongTensor) (N): The data target.
-        Returns:
-            metric (torch.Tensor) (0): The accuracy.
-        """
-        pred = torch.argmax(output, dim=1)
-        #self.T += (pred == target).float()
-        #self.F += (pred != target).float()
-        #return self.T / (self.F + self.T + 1e-10)
-        return pred==target
-        
-class FalseNegativeSize(nn.Module):
-    """The false negative target size.
-    """
-    def __init__(self):
-        super().__init__()
-       
-    def reset(self):
-        pass
-
-    def forward(self, output, target):
-        """
-        Args:
-            output (torch.Tensor) (N, C, *): The model output.
-            target (torch.LongTensor) (N, 1, *): The data target.
-        Returns:
-            metric (torch.Tensor) (C): The average false negative size for each class.
-        """
-        scores = []
-        # Get the one-hot encoding of the prediction and the ground truth label.
-        pred = output.argmax(dim=1, keepdim=True)
-        pred = torch.zeros_like(output).scatter_(1, pred, 1)
-        target = torch.zeros_like(output).scatter_(1, target, 1)
-        
-        # Calculate the score for each class
-        for i in range(1, output.shape[1]):
-            label_target = label(target[:, i].squeeze(dim=0).cpu().numpy(), connectivity=output.dim()-2)
-            label_target_list = np.unique(label_target)[1:]
-            _pred = pred[:, i].squeeze(dim=0).cpu().numpy()
-            
-            score = []
-            for target_id in label_target_list:
-                if (np.sum((_pred == 1) * (label_target == target_id)) == 0):
-                    score.append(np.sum(label_target == target_id) / 1000.0)
-            scores.append(score)
-        return scores

@@ -1,0 +1,71 @@
+dataloader:
+  kwargs:
+    num_workers: 2
+    shuffle: true
+    train_batch_size: 1
+    valid_batch_size: 1
+  name: Dataloader
+dataset:
+  kwargs:
+    augments: null
+    data_dir: /home/tony/Documents/gcn_preprocess/kits19_3d
+    data_split_csv: /home/tony/Documents/data_split/kits_data_split.csv
+    train_preprocessings: null
+    transforms:
+    - name: ToTensor
+    valid_preprocessings: null
+  name: DGLClfDataset
+logger:
+  kwargs:
+    dummy_input:
+    - 16
+    - 1
+    - 128
+    - 128
+  name: KitsClfLogger
+losses:
+- kwargs:
+    weight:
+    - 0.5
+    - 0.5
+  name: MyBCELoss
+  weight: 1.0
+main:
+  random_seed: kits19
+  saved_dir: /home/tony/Documents/GCN_template/models/tmp/train
+metrics:
+- name: Accuracy
+- name: F1Score
+monitor:
+  kwargs:
+    early_stop: 0
+    mode: min
+    saved_freq: 10
+    target: Loss
+  name: Monitor
+net:
+  kwargs:
+    hidden_dim: 128
+    in_dim: 128
+    n_class: 2
+  name: GCNClassifier
+optimizer:
+  kwargs:
+    amsgrad: false
+    lr: 0.001
+    weight_decay: 0
+  name: Adam
+preprocess:
+  compactness: 0.1
+  data_dir: /home/tony/Documents/kits19/data/
+  n_features: 128
+  n_segments: 2048
+  n_vertexs: 2048
+  output_dir: /home/tony/Documents/gcn_preprocess/kits19_3d
+  tao: 0.5
+  z_crop_size: 48
+trainer:
+  kwargs:
+    device: cuda:0
+    num_epochs: 100
+  name: DGLClfTrainer

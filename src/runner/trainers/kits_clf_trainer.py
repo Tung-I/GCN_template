@@ -1,4 +1,6 @@
 import torch
+import dgl
+from tqdm import tqdm
 from src.runner.trainers.base_trainer import BaseTrainer
 
 
@@ -8,6 +10,53 @@ class KitsClfTrainer(BaseTrainer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+
+    def _run_epoch(self, mode):
+        """Run an epoch for training.
+        Args:
+            mode (str): The mode of running an epoch ('training' or 'validation').
+        Returns:
+            log (dict): The log information.
+            batch (dict or sequence): The last batch of the data.
+            outputs (torch.Tensor or sequence of torch.Tensor): The corresponding model outputs.
+        """
+        if mode == 'training':
+            self.net.train()
+        else:
+            self.net.eval()
+        dataloader = self.train_dataloader if mode == 'training' else self.valid_dataloader
+        trange = tqdm(dataloader,
+                      total=len(dataloader),
+                      desc=mode)
+
+        log = self._init_log()
+
+        for m in self.metric_fns:
+            m.reset()
+
+        for batch in trange:
+            batch = self._allocate_data(batch)
+            graphs, labels = self._get_inputs_targets(batch)
+            if mode == 'training':
+                outputs = self.net(graphs)
+                losses = self._compute_losses(outputs, labels)
+                loss = (torch.stack(losses) * self.loss_weights).sum()
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+            else:
+                with torch.no_grad():
+                    outputs = self.net(graphs)
+                    losses = self._compute_losses(outputs, labels)
+                    loss = (torch.stack(losses) * self.loss_weights).sum()
+            metrics =  self._compute_metrics(outputs, labels)
+            batch_size = self.train_dataloader.batch_size if mode == 'training' else self.valid_dataloader.batch_size
+            self._update_log(log, batch_size, loss, losses, metrics)
+            trange.set_postfix(**dict((key, f'{value: .3f}') for key, value in log.items()))
+
+        return log, batch, outputs
+
+
     def _get_inputs_targets(self, batch):
         """Specify the data input and target.
         Args:
@@ -16,10 +65,37 @@ class KitsClfTrainer(BaseTrainer):
             input (torch.Tensor): The data input.
             target (torch.LongTensor): The data target.
         """
-        f = torch.squeeze(batch['features'], 0)
-        l = torch.squeeze(batch['label'], 0)
-        a = torch.squeeze(batch['adj_arr'], 0)
-        return f, l, a
+        features = batch['feature']
+        labels = batch['label']
+        adj_arrs = batch['adj_arr']
+
+        n_batch = labels.size(0)
+
+        graphs = []
+        for i in range(n_batch):
+            feature = features[i]
+            label = labels[i]
+            adj_arr = adj_arrs[i]
+
+            n_node = feature.size(0)
+            g = dgl.DGLGraph()
+            g.add_nodes(n_node)
+            for i in tqdm(range(n_node)):
+                src = list(range(n_node))
+                dst = [i] * n_node
+                g.add_edges(src, dst)
+                val = torch.FloatTensor(n_node, 2)
+                val[:, 0] = adj_arr[i]
+                val[:, 1] = adj_arr[i]
+                g.edges[src, dst].data['w'] = val 
+            g.ndata['x'] = feature
+            g.to(self.device)
+            # print(g.ndata['x'].device)
+            graphs.append(g)
+
+        batched_graph = dgl.batch(graphs)
+        
+        return batched_graph, labels
 
     def _compute_losses(self, output, target):
         """Compute the losses.
@@ -53,12 +129,7 @@ class KitsClfTrainer(BaseTrainer):
         for loss in self.loss_fns:
             log[loss.__class__.__name__] = 0
         for metric in self.metric_fns:
-            if metric.__class__.__name__ == 'Dice':
-                log['Dice'] = 0
-                for i in range(self.net.n_class):
-                    log[f'Dice_{i}'] = 0
-            else:
-                log[metric.__class__.__name__] = 0
+            log[metric.__class__.__name__] = 0
         return log
 
     def _update_log(self, log, batch_size, loss, losses, metrics):
@@ -70,13 +141,19 @@ class KitsClfTrainer(BaseTrainer):
             losses (list of torch.Tensor): The computed losses.
             metrics (list of torch.Tensor): The computed metrics.
         """
-        log['Loss'] += loss.item() * batch_size
+        log['Loss'] = loss.item()
         for loss, _loss in zip(self.loss_fns, losses):
-            log[loss.__class__.__name__] += _loss.item() * batch_size
+            log[loss.__class__.__name__] = _loss.item()
         for metric, _metric in zip(self.metric_fns, metrics):
-            if metric.__class__.__name__ == 'Dice':
-                log['Dice'] += _metric.mean().item() * batch_size
-                for i, class_score in enumerate(_metric):
-                    log[f'Dice_{i}'] += class_score.item() * batch_size
-            else:
-                log[metric.__class__.__name__] += _metric.item() * batch_size
+            log[metric.__class__.__name__] = _metric.item()
+
+        # log['Loss'] += loss.item() * batch_size
+        # for loss, _loss in zip(self.loss_fns, losses):
+        #     log[loss.__class__.__name__] += _loss.item() * batch_size
+        # for metric, _metric in zip(self.metric_fns, metrics):
+        #     if metric.__class__.__name__ == 'Dice':
+        #         log['Dice'] += _metric.mean().item() * batch_size
+        #         for i, class_score in enumerate(_metric):
+        #             log[f'Dice_{i}'] += class_score.item() * batch_size
+        #     else:
+        #         log[metric.__class__.__name__] += _metric.item() * batch_size

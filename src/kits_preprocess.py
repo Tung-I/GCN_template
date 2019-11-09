@@ -46,23 +46,23 @@ def main(args):
         label = np.transpose(label, (1, 2, 0))
 
         image, label = zaxis_crop(image, label, Z_CROP_SIZE)
-        # label_only_tumor = label.copy()
-        # label_only_tumor[np.where(label==1)] = 0
-        # clf_label = np.array(1) if np.count_nonzero(label_only_tumor) > 0 else np.array(0)
+        label_only_tumor = label.copy()
+        label_only_tumor[np.where(label==1)] = 0
+        clf_label = np.array(1) if np.count_nonzero(label_only_tumor) > 0 else np.array(0)
 
         image = max_min_normalize(image)
         segments = slic(image.astype('double'), n_segments=N_SEGMENTS, compactness=COMPACTNESS, multichannel=False)
         features = feature_extract(image, segments, N_VERTEXS, N_FEATURES)
         adj_arr = adj_generate(features, segments, TAO)
-        gcn_label = label_transform(label, segments, N_VERTEXS, N_FEATURES)
+        # gcn_label = label_transform(label, segments, N_VERTEXS, N_FEATURES)
         
         # np.save(str(output_dir / path.parts[-1] / f'image.npy'), image)
         # np.save(str(output_dir / path.parts[-1] / f'label.npy'), label)
-        # np.save(str(output_dir / path.parts[-1] / f'clf_label.npy'), clf_label)
-        np.save(str(output_dir / path.parts[-1] / f'segments.npy'), segments)
+        np.save(str(output_dir / path.parts[-1] / f'clf_label.npy'), clf_label)
+        # np.save(str(output_dir / path.parts[-1] / f'segments.npy'), segments)
         np.save(str(output_dir / path.parts[-1] / f'features.npy'), features)
         np.save(str(output_dir / path.parts[-1] / f'adj_arr.npy'), adj_arr)
-        np.save(str(output_dir / path.parts[-1] / f'gcn_label.npy'), gcn_label)
+        # np.save(str(output_dir / path.parts[-1] / f'gcn_label.npy'), gcn_label)
 #         if image.shape[0]!=512 or image.shape[1]!=512:
 #             print(f'woops {image.shape}')
 
@@ -90,6 +90,7 @@ def zaxis_crop(img, label, crop_size):
     d_back = d_front + crop_size
 
     return img[:, :, d_front:d_back], label[:, :, d_front:d_back]
+
 
 
 def max_min_normalize(img):
